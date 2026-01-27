@@ -1,10 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import requests
 import random
+import os
 
 app = Flask(__name__)
 
-HF_API_KEY = "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"
+# Get API key securely from environment
+HF_API_KEY = os.environ.get("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")
+
 MODEL_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 
 headers = {
@@ -12,28 +15,40 @@ headers = {
 }
 
 def generate_odds(question):
-    base = random.randint(25, 75)
+    base_probability = random.randint(30, 75)
 
     prompt = f"""
 Question: {question}
-Give a logical probability in percentage and explain shortly why.
-Format:
+
+Give a logical probability in percentage and a short explanation.
+Format exactly like this:
 Percentage: XX%
 Explanation: ...
 """
 
-    response = requests.post(
-        MODEL_URL,
-        headers=headers,
-        json={"inputs": prompt}
-    )
+    try:
+        response = requests.post(
+            MODEL_URL,
+            headers=headers,
+            json={"inputs": prompt},
+            timeout=15
+        )
 
-    if response.status_code != 200:
-        return base, "Logic based on common patterns and probability."
+        if response.status_code != 200:
+            raise Exception("Model error")
 
-    text = response.json()[0]["generated_text"]
+        result = response.json()
 
-    return base, text
+        generated_text = result[0].get("generated_text", "")
+
+        return base_probability, generated_text
+
+    except Exception:
+        return base_probability, "Based on common real-world patterns and probability."
+
+@app.route("/")
+def home():
+    return send_from_directory(".", "index.html")
 
 @app.route("/ask", methods=["POST"])
 def ask():
@@ -48,5 +63,4 @@ def ask():
     })
 
 if __name__ == "__main__":
-    app.run()
-
+    app.run(host="0.0.0.0", port=10000)
