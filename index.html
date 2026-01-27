@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Probability Engine</title>
+  <style>
+    body {
+      background: #0f0f0f;
+      color: white;
+      font-family: Arial;
+      text-align: center;
+      padding: 50px;
+    }
+    input {
+      width: 80%;
+      padding: 15px;
+      font-size: 16px;
+    }
+    button {
+      padding: 15px 30px;
+      margin-top: 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .result {
+      margin-top: 30px;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>What Are The Odds?</h1>
+
+<input id="question" placeholder="Ask anything..." />
+<br>
+<button onclick="ask()">Calculate</button>
+
+<div class="result" id="result"></div>
+
+<script>
+async function ask() {
+  const q = document.getElementById("question").value;
+
+  const res = await fetch("/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({question: q})
+  });
+
+  const data = await res.json();
+
+  document.getElementById("result").innerHTML =
+    `<b>${data.percentage}</b><br><small>${data.explanation}</small>`;
+}
+</script>
+
+</body>
+</html>
