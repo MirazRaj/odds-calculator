@@ -4,7 +4,7 @@ import random
 
 app = Flask(__name__)
 
-HF_API_KEY = "PASTE_YOUR_TOKEN_HERE"
+HF_API_KEY = "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"
 MODEL_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 
 headers = {
@@ -49,3 +49,4 @@ def ask():
 
 if __name__ == "__main__":
     app.run()
+
