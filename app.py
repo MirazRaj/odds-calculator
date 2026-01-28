@@ -1,84 +1,26 @@
-from flask import Flask, request, jsonify, send_from_directory
-import requests
 import os
 import hashlib
+import requests
+from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
-HF_API_KEY = os.environ.get("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")
-MODEL_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
+HF_API_KEY = os.environ.get("HF_API_KEY")
+MODEL_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
 headers = {
     "Authorization": f"Bearer {HF_API_KEY}"
 }
 
-# -----------------------------
-# REALITY-BASED PROBABILITY LOGIC
-# -----------------------------
-def determine_probability(question):
-    q = question.lower()
+# ---------- UTILITIES ----------
 
-    # HARD IMPOSSIBLE EVENTS
-    impossible_keywords = [
-        "anime", "waifu", "come out of the screen", "time travel",
-        "revive", "dead person", "magic", "teleport", "fictional",
-        "superpower", "immortal"
-    ]
-
-    if any(word in q for word in impossible_keywords):
-        return 0, (
-            "This event is physically impossible because it violates known laws "
-            "of reality and involves fictional or non-existent phenomena."
-        )
-
-    # EXTREMELY SHORT TIME EVENTS
-    short_time_keywords = ["tomorrow", "today", "next 24 hours", "3 days"]
-
-    if any(word in q for word in short_time_keywords):
-        return 5, (
-            "The timeframe is extremely short, making the probability very low "
-            "due to practical and social constraints."
-        )
-
-    # RELATIONSHIP / LIFE OUTCOMES
-    life_keywords = ["girlfriend", "boyfriend", "marriage", "love", "relationship"]
-
-    if any(word in q for word in life_keywords):
-        percent = stable_hash_percentage(question, 20, 50)
-        return percent, (
-            "Human relationships depend on time, interaction, mutual interest, "
-            "and circumstances, which makes outcomes uncertain but possible."
-        )
-
-    # DEFAULT REALISTIC UNCERTAINTY
-    percent = stable_hash_percentage(question, 25, 65)
-    return percent, (
-        "The outcome depends on multiple real-world factors, effort, chance, "
-        "and conditions beyond full control."
-    )
+def stable_hash_percentage(text, low, high):
+    h = hashlib.sha256(text.encode()).hexdigest()
+    num = int(h[:8], 16)
+    return low + (num % (high - low + 1))
 
 
-def stable_hash_percentage(text, min_p, max_p):
-    h = int(hashlib.sha256(text.encode()).hexdigest(), 16)
-    return min_p + (h % (max_p - min_p))
-
-
-# -----------------------------
-# AI EXPLANATION (NO BULLSHIT)
-# -----------------------------
-def explain_with_ai(question, percentage, core_reason):
-    prompt = f"""
-Question: {question}
-Probability: {percentage}%
-
-Core reasoning:
-{core_reason}
-
-Explain this clearly and logically in simple human language.
-Do NOT invent fantasy or unrealistic logic.
-Keep it short.
-"""
-
+def ask_ai(prompt):
     try:
         r = requests.post(
             MODEL_URL,
@@ -86,34 +28,92 @@ Keep it short.
             json={"inputs": prompt},
             timeout=20
         )
-        return r.json()[0]["generated_text"]
+        return r.json()[0]["generated_text"].strip()
     except:
-        return core_reason
+        return ""
 
 
-# -----------------------------
-# ROUTES
-# -----------------------------
+# ---------- CORE LOGIC ----------
+
+def analyze_question(question):
+    prompt = f"""
+Analyze this question realistically:
+
+"{question}"
+
+Answer in ONE sentence:
+- Is this event common, rare, extremely rare, or impossible?
+- Mention real-world constraints if any.
+"""
+    analysis = ask_ai(prompt)
+
+    if not analysis:
+        analysis = "This event depends on real-world conditions and limitations."
+
+    return analysis
+
+
+def decide_probability(question, analysis):
+    a = analysis.lower()
+
+    if "impossible" in a:
+        return 0
+
+    if "extremely rare" in a:
+        return stable_hash_percentage(question, 1, 5)
+
+    if "rare" in a:
+        return stable_hash_percentage(question, 5, 20)
+
+    if "common" in a:
+        return stable_hash_percentage(question, 40, 70)
+
+    return stable_hash_percentage(question, 20, 50)
+
+
+def explain_probability(question, percentage, analysis):
+    prompt = f"""
+Question: {question}
+Probability: {percentage}%
+
+Analysis:
+{analysis}
+
+Explain clearly and logically why the probability is around this value.
+Keep it grounded in reality.
+"""
+    explanation = ask_ai(prompt)
+
+    if not explanation:
+        explanation = analysis
+
+    return explanation
+
+
+# ---------- ROUTES ----------
+
 @app.route("/")
-def home():
+def index():
     return send_from_directory(".", "index.html")
 
 
-@app.route("/ask", methods=["POST"])
-def ask():
+@app.route("/calculate", methods=["POST"])
+def calculate():
     data = request.json
     question = data.get("question", "").strip()
 
     if not question:
         return jsonify({
-            "error": "Please enter a question before calculating odds."
-        }), 400
+            "percentage": "--",
+            "explanation": "Ask a question to calculate realistic odds."
+        })
 
-    percent, core_reason = determine_probability(question)
-    explanation = explain_with_ai(question, percent, core_reason)
+    analysis = analyze_question(question)
+    percentage = decide_probability(question, analysis)
+    explanation = explain_probability(question, percentage, analysis)
 
     return jsonify({
-        "percentage": f"{percent}%",
+        "percentage": f"{percentage}%",
         "explanation": explanation
     })
 
