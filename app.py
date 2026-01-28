@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
-HF_API_KEY = os.environ.get("HF_API_KEY")
+HF_API_KEY = os.environ.get("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")
 MODEL_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
 
 headers = {
@@ -120,3 +120,4 @@ def calculate():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
