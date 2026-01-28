@@ -12,7 +12,7 @@ headers = {
     "Authorization": f"Bearer {HF_API_KEY}"
 }
 
-# ---------- UTILITIES ----------
+# ---------------- UTILITIES ----------------
 
 def stable_hash_percentage(text, low, high):
     h = hashlib.sha256(text.encode()).hexdigest()
@@ -28,12 +28,15 @@ def ask_ai(prompt):
             json={"inputs": prompt},
             timeout=20
         )
-        return r.json()[0]["generated_text"].strip()
+        data = r.json()
+        if isinstance(data, list) and "generated_text" in data[0]:
+            return data[0]["generated_text"].strip()
     except:
-        return ""
+        pass
+    return ""
 
 
-# ---------- CORE LOGIC ----------
+# ---------------- CORE LOGIC ----------------
 
 def analyze_question(question):
     prompt = f"""
@@ -41,16 +44,11 @@ Analyze this question realistically:
 
 "{question}"
 
-Answer in ONE sentence:
-- Is this event common, rare, extremely rare, or impossible?
-- Mention real-world constraints if any.
+Classify it as common, rare, extremely rare, or impossible.
+Mention real-world constraints briefly.
 """
     analysis = ask_ai(prompt)
-
-    if not analysis:
-        analysis = "This event depends on real-world conditions and limitations."
-
-    return analysis
+    return analysis or "This event is constrained by real-world limitations."
 
 
 def decide_probability(question, analysis):
@@ -58,13 +56,10 @@ def decide_probability(question, analysis):
 
     if "impossible" in a:
         return 0
-
     if "extremely rare" in a:
         return stable_hash_percentage(question, 1, 5)
-
     if "rare" in a:
         return stable_hash_percentage(question, 5, 20)
-
     if "common" in a:
         return stable_hash_percentage(question, 40, 70)
 
@@ -74,32 +69,26 @@ def decide_probability(question, analysis):
 def explain_probability(question, percentage, analysis):
     prompt = f"""
 Question: {question}
-Probability: {percentage}%
+Estimated Probability: {percentage}%
 
-Analysis:
-{analysis}
-
-Explain clearly and logically why the probability is around this value.
-Keep it grounded in reality.
+Explain logically WHY the probability is around this value.
+Base it on reality, constraints, and likelihood.
 """
     explanation = ask_ai(prompt)
-
-    if not explanation:
-        explanation = analysis
-
-    return explanation
+    return explanation or analysis
 
 
-# ---------- ROUTES ----------
+# ---------------- ROUTES ----------------
 
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
 
 
-@app.route("/calculate", methods=["POST"])
-def calculate():
-    data = request.json
+# 🔥 THIS MATCHES YOUR FRONTEND
+@app.route("/ask", methods=["POST"])
+def ask():
+    data = request.json or {}
     question = data.get("question", "").strip()
 
     if not question:
@@ -120,4 +109,3 @@ def calculate():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
